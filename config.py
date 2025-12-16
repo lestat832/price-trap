@@ -15,6 +15,10 @@ class Settings:
     # Get your API key at: https://serpapi.com/
     SERPAPI_KEY: Optional[str] = os.getenv("SERPAPI_KEY")
 
+    # Authentication credentials (required for production)
+    AUTH_USERNAME: Optional[str] = os.getenv("AUTH_USERNAME")
+    AUTH_PASSWORD: Optional[str] = os.getenv("AUTH_PASSWORD")
+
     # Enable mock mode for testing without API keys
     MOCK_MODE: bool = os.getenv("MOCK_MODE", "false").lower() == "true"
 
@@ -29,6 +33,10 @@ class Settings:
     @property
     def any_real_source_available(self) -> bool:
         return self.ebay_available or self.serpapi_available
+
+    @property
+    def auth_enabled(self) -> bool:
+        return bool(self.AUTH_USERNAME and self.AUTH_PASSWORD)
 
 
 settings = Settings()

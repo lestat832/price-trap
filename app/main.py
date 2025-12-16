@@ -1,9 +1,13 @@
 import asyncio
+import secrets
 from pathlib import Path
 from typing import List
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.responses import FileResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+
+from config import settings
 
 from app.deduplicator import deduplicate_listings
 from app.models import CompareRequest, CompareResponse, Listing
@@ -26,9 +30,45 @@ SOURCES: List[Source] = [
     MockSource(),
 ]
 
+# HTTP Basic Auth (auto_error=False allows requests without credentials)
+security = HTTPBasic(auto_error=False)
+
+
+def verify_credentials(credentials: HTTPBasicCredentials = Depends(security)):
+    """Verify HTTP Basic Auth credentials. Disabled if AUTH_USERNAME/AUTH_PASSWORD not set."""
+    if not settings.auth_enabled:
+        return  # Auth disabled for local development
+
+    # If auth is enabled but no credentials provided, prompt for login
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+
+    correct_username = secrets.compare_digest(
+        credentials.username.encode("utf-8"),
+        settings.AUTH_USERNAME.encode("utf-8")
+    )
+    correct_password = secrets.compare_digest(
+        credentials.password.encode("utf-8"),
+        settings.AUTH_PASSWORD.encode("utf-8")
+    )
+
+    if not (correct_username and correct_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+
 
 @app.post("/compare", response_model=CompareResponse)
-async def compare_prices(request: CompareRequest) -> CompareResponse:
+async def compare_prices(
+    request: CompareRequest,
+    _: None = Depends(verify_credentials)
+) -> CompareResponse:
     """
     Compare prices for a product across multiple sources.
 
@@ -67,7 +107,7 @@ async def compare_prices(request: CompareRequest) -> CompareResponse:
 
 
 @app.get("/health")
-async def health_check() -> dict:
+async def health_check(_: None = Depends(verify_credentials)) -> dict:
     """Health check endpoint."""
     available_sources = [s.name for s in SOURCES if s.is_available()]
     return {
@@ -77,7 +117,7 @@ async def health_check() -> dict:
 
 
 @app.get("/")
-async def serve_frontend() -> FileResponse:
+async def serve_frontend(_: None = Depends(verify_credentials)) -> FileResponse:
     """Serve the frontend HTML page."""
     html_path = Path(__file__).parent.parent / "index.html"
     return FileResponse(html_path)

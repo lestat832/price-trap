@@ -131,7 +131,7 @@
     <div id="results" class="results"></div>
 
     <script>
-        const API_URL = 'http://localhost:8000';
+        const API_URL = '';  // Use relative URLs for same-origin requests
 
         async function search(e) {
             e.preventDefault();
@@ -149,6 +149,7 @@
                 const response = await fetch(`${API_URL}/compare`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
                     body: JSON.stringify({ product_name: product })
                 });
 
@@ -159,7 +160,7 @@
                 const data = await response.json();
                 displayResults(data);
             } catch (err) {
-                resultsDiv.innerHTML = `<div class="error">Error: ${err.message}. Make sure the API is running on localhost:8000</div>`;
+                resultsDiv.innerHTML = `<div class="error">Error: ${err.message}</div>`;
             } finally {
                 searchBtn.disabled = false;
                 searchBtn.textContent = 'Search';
